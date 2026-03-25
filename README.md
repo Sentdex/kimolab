@@ -1,139 +1,140 @@
-![Project banner](https://raw.githubusercontent.com/mujocolab/mjlab/main/docs/source/_static/mjlab-banner.jpg)
+# KimoLab
 
-# mjlab
+**Text-to-physics motion generation.** Type a text prompt, get a physics-trained robot policy.
 
-[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/mujocolab/mjlab/ci.yml?branch=main)](https://github.com/mujocolab/mjlab/actions/workflows/ci.yml?query=branch%3Amain)
-[![Documentation](https://github.com/mujocolab/mjlab/actions/workflows/docs.yml/badge.svg)](https://mujocolab.github.io/mjlab/)
-[![License](https://img.shields.io/github/license/mujocolab/mjlab)](https://github.com/mujocolab/mjlab/blob/main/LICENSE)
-[![Nightly Benchmarks](https://img.shields.io/badge/Nightly-Benchmarks-blue)](https://mujocolab.github.io/mjlab/nightly/)
-[![PyPI](https://img.shields.io/pypi/v/mjlab)](https://pypi.org/project/mjlab/)
+KimoLab combines [NVIDIA Kimodo](https://huggingface.co/spaces/nvidia/Kimodo) (text-to-motion diffusion) with [mjlab](https://github.com/mujocolab/mjlab) (GPU-accelerated robot learning via MuJoCo Warp) to create an end-to-end pipeline:
 
-mjlab combines [Isaac Lab](https://github.com/isaac-sim/IsaacLab)'s manager-based API with [MuJoCo Warp](https://github.com/google-deepmind/mujoco_warp), a GPU-accelerated version of [MuJoCo](https://github.com/google-deepmind/mujoco).
-The framework provides composable building blocks for environment design,
-with minimal dependencies and direct access to native MuJoCo data structures.
+```
+"A person bends down and does a forward somersault."
+        |  (Kimodo G1 model)
+    G1 joint angles CSV
+        |  (MuJoCo forward kinematics)
+    NPZ reference motion
+        |  (RL training with 4096 parallel envs)
+    Physics-based G1 policy
+```
 
-## Getting Started
+## Quick Start
 
-mjlab requires an NVIDIA GPU for training. macOS is supported for evaluation only.
+Requires an NVIDIA GPU with CUDA support.
 
-**Try it now:**
-
-Run the demo (no installation needed):
+**1. Clone and install:**
 
 ```bash
-uvx --from mjlab --refresh demo
+git clone https://github.com/Sentdex/kimolab.git && cd kimolab
+git checkout kimolab
+uv sync --extra kimodo
 ```
 
-Or try in [Google Colab](https://colab.research.google.com/github/mujocolab/mjlab/blob/main/notebooks/demo.ipynb) (no local setup required).
+You also need access to [Meta-Llama-3-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct) on Hugging Face (accept the license, set `HF_TOKEN`).
 
-**Install from source:**
+**2. Generate a motion from text:**
 
 ```bash
-git clone https://github.com/mujocolab/mjlab.git && cd mjlab
-uv run demo
+uv run prompt-to-csv \
+  --prompt "A person bends down and does a forward somersault." \
+  --duration 5.0 --seed 55 --output motion.csv
 ```
 
-For alternative installation methods (PyPI, Docker), see the [Installation Guide](https://mujocolab.github.io/mjlab/main/source/installation.html).
-
-## Training Examples
-
-### 1. Velocity Tracking
-
-Train a Unitree G1 humanoid to follow velocity commands on flat terrain:
+**3. Preview it before training:**
 
 ```bash
-uv run train Mjlab-Velocity-Flat-Unitree-G1 --env.scene.num-envs 4096
+# Convert to NPZ first
+MUJOCO_GL=egl uv run -m mjlab.scripts.csv_to_npz \
+  --input-file motion.csv --output-name my_motion \
+  --input-fps 30 --output-fps 50 --render False
+
+cp /tmp/motion.npz motion.npz
+
+# Preview in MuJoCo viewer
+uv run preview-motion motion.npz --loop
 ```
 
-**Multi-GPU Training:** Scale to multiple GPUs using `--gpu-ids`:
+**4. Train a physics controller:**
 
 ```bash
-uv run train Mjlab-Velocity-Flat-Unitree-G1 \
-  --gpu-ids "[0, 1]" \
-  --env.scene.num-envs 4096
+MUJOCO_GL=egl uv run train Mjlab-Tracking-Flat-Unitree-G1 \
+  --env.commands.motion.motion-file motion.npz \
+  --env.scene.num-envs 4096 \
+  --env.episode-length-s 6.0 \
+  --env.terminations.anchor-pos.params.threshold 100.0 \
+  --env.terminations.anchor-ori.params.threshold 100.0 \
+  --env.terminations.ee-body-pos.params.threshold 100.0 \
+  --agent.save-interval 100
 ```
 
-See the [Distributed Training guide](https://mujocolab.github.io/mjlab/main/source/training/distributed_training.html) for details.
-
-Evaluate a policy while training (fetches latest checkpoint from Weights & Biases):
+**5. Watch the trained policy:**
 
 ```bash
-uv run play Mjlab-Velocity-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
+uv run play Mjlab-Tracking-Flat-Unitree-G1 \
+  --wandb-run-path your-user/mjlab/run-id \
+  --no-terminations True
 ```
 
-### 2. Motion Imitation
+## Multi-Prompt Sequences
 
-Train a humanoid to mimic reference motions. See the [motion imitation guide](https://mujocolab.github.io/mjlab/main/source/training/motion_imitation.html) for preprocessing setup.
+Chain multiple motions together using a YAML file:
+
+```yaml
+# motions/my_sequence.yaml
+sequences:
+  - prompt: "A person walks forward confidently"
+    duration: 6.0
+  - prompt: "A person waves with their right hand"
+    duration: 3.0
+```
 
 ```bash
-uv run train Mjlab-Tracking-Flat-Unitree-G1 --registry-name your-org/motions/motion-name --env.scene.num-envs 4096
-uv run play Mjlab-Tracking-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
+uv run prompt-to-csv --motion-file motions/my_sequence.yaml --output sequence.csv
 ```
 
-### 3. Sanity-check with Dummy Agents
+## New Commands
 
-Use built-in agents to sanity check your MDP before training:
+| Command | Description |
+|---------|-------------|
+| `uv run prompt-to-csv` | Generate G1 motion CSV from text prompts |
+| `uv run prompt-train` | End-to-end pipeline (prompt -> CSV -> NPZ -> train) |
+| `uv run preview-motion` | Preview reference motion in MuJoCo viewer |
 
-```bash
-uv run play Mjlab-Your-Task-Id --agent zero  # Sends zero actions
-uv run play Mjlab-Your-Task-Id --agent random  # Sends uniform random actions
-```
+## How It Works
 
-When running motion-tracking tasks, add `--registry-name your-org/motions/motion-name` to the command.
+1. **Kimodo** generates kinematic G1 robot motions directly from text using a diffusion model with an LLM2Vec text encoder (Meta-Llama-3-8B-Instruct backbone)
+2. **MuJoCo FK** converts the joint angles to full body positions/orientations/velocities
+3. **mjlab** trains a physics-based RL policy (PPO) to track the reference motion in simulation with 4096 parallel environments on GPU via MuJoCo Warp
+4. The trained policy outputs joint torques that make the G1 physically execute the motion with real dynamics, contacts, and gravity
 
+## Demo Motion
 
-## Documentation
+The included demo uses:
+- **Prompt:** "A person bends down and does a forward somersault."
+- **Duration:** 5.0 seconds
+- **Seed:** 55
+- **Model:** kimodo-g1-rp
 
-Full documentation is available at **[mujocolab.github.io/mjlab](https://mujocolab.github.io/mjlab/)**.
+See `motions/demo_somersault.yaml` for the full config.
 
-## Development
+---
 
-```bash
-make test          # Run all tests
-make test-fast     # Skip slow tests
-make format        # Format and lint
-make docs          # Build docs locally
-```
+## Original mjlab Features
 
-For development setup: `uvx pre-commit install`
-
-## Citation
-
-mjlab is used in published research and open-source robotics projects. See the [Research](https://mujocolab.github.io/mjlab/main/source/research.html) page for publications and projects, or share your own in [Show and Tell](https://github.com/mujocolab/mjlab/discussions/categories/show-and-tell).
-
-If you use mjlab in your research, please consider citing:
-
-```bibtex
-@misc{zakka2026mjlablightweightframeworkgpuaccelerated,
-  title={mjlab: A Lightweight Framework for GPU-Accelerated Robot Learning},
-  author={Kevin Zakka and Qiayuan Liao and Brent Yi and Louis Le Lay and Koushil Sreenath and Pieter Abbeel},
-  year={2026},
-  eprint={2601.22074},
-  archivePrefix={arXiv},
-  primaryClass={cs.RO},
-  url={https://arxiv.org/abs/2601.22074},
-}
-```
+All original mjlab features are fully retained. See the [mjlab documentation](https://mujocolab.github.io/mjlab/) for:
+- Velocity tracking
+- Motion imitation from CSV/WandB
+- Multi-GPU training
+- Distributed training
 
 ## License
 
-mjlab is licensed under the [Apache License, Version 2.0](LICENSE).
+KimoLab is licensed under the [Apache License, Version 2.0](LICENSE), same as mjlab.
 
 ### Third-Party Code
 
-Some portions of mjlab are forked from external projects:
-
-- **`src/mjlab/utils/lab_api/`** — Utilities forked from [NVIDIA Isaac
-  Lab](https://github.com/isaac-sim/IsaacLab) (BSD-3-Clause license, see file
-  headers)
-
-Forked components retain their original licenses. See file headers for details.
+- **mjlab** — Forked from [mujocolab/mjlab](https://github.com/mujocolab/mjlab) (Apache-2.0)
+- **Kimodo** — [NVIDIA Kimodo](https://github.com/nv-tlabs/kimodo) (Apache-2.0), models under NVIDIA Open Model License
+- **`src/mjlab/utils/lab_api/`** — Utilities from [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) (BSD-3-Clause)
 
 ## Acknowledgments
 
-mjlab wouldn't exist without the excellent work of the Isaac Lab team, whose API
-design and abstractions mjlab builds upon.
-
-Thanks to the MuJoCo Warp team — especially Erik Frey and Taylor Howell — for
-answering our questions, giving helpful feedback, and implementing features
-based on our requests countless times.
+- [mjlab](https://github.com/mujocolab/mjlab) team for the excellent GPU-accelerated RL framework
+- [NVIDIA Kimodo](https://huggingface.co/spaces/nvidia/Kimodo) team for the text-to-motion generation model
+- [MuJoCo Warp](https://github.com/google-deepmind/mujoco_warp) team for GPU-accelerated physics
