@@ -1,0 +1,4 @@
+# KimoLab: Simple single-motion example
+sequences:
+  - prompt: "A person walks forward"
+    duration: 6.0

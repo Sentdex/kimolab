@@ -1,0 +1,9 @@
+# KimoLab: Example multi-prompt motion sequence for Kimodo G1
+# Each sequence is generated independently and blended at boundaries.
+sequences:
+  - prompt: "A person walks forward confidently"
+    duration: 6.0
+  - prompt: "A person waves with their right hand while standing"
+    duration: 3.0
+  - prompt: "A person turns around and walks back"
+    duration: 5.0

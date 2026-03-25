@@ -1,0 +1,10 @@
+# KimoLab Demo: Forward somersault
+# Prompt: "A person bends down and does a forward somersault."
+# Duration: 5.0s | Seed: 55 | Model: kimodo-g1-rp
+#
+# Generate: uv run prompt-to-csv --prompt "A person bends down and does a forward somersault." --duration 5.0 --seed 55 --output motion.csv
+# Preview:  uv run preview-motion motion.npz --loop
+# Train:    uv run train Mjlab-Tracking-Flat-Unitree-G1 --env.commands.motion.motion-file motion.npz --env.scene.num-envs 4096 --env.episode-length-s 6.0 --env.terminations.anchor-pos.params.threshold 100.0 --env.terminations.anchor-ori.params.threshold 100.0 --env.terminations.ee-body-pos.params.threshold 100.0 --agent.save-interval 100
+sequences:
+  - prompt: "A person bends down and does a forward somersault."
+    duration: 5.0

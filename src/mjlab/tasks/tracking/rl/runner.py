@@ -54,9 +54,12 @@ class MotionTrackingOnPolicyRunner(MjlabOnPolicyRunner):
     log_dir: str | None = None,
     device: str = "cpu",
     registry_name: str | None = None,
+    local_motion_file: str | None = None,
   ):
     super().__init__(env, train_cfg, log_dir, device)
     self.registry_name = registry_name
+    self._local_motion_file = local_motion_file
+    self._motion_artifact_logged = False
 
   def export_policy_to_onnx(
     self, path: str, filename: str = "policy.onnx", verbose: bool = False
@@ -114,5 +117,20 @@ class MotionTrackingOnPolicyRunner(MjlabOnPolicyRunner):
         if self.registry_name is not None:
           wandb.run.use_artifact(self.registry_name)  # type: ignore
           self.registry_name = None
+        # Upload local motion file as artifact so play can find it later.
+        if self._local_motion_file and not self._motion_artifact_logged:
+          import shutil
+          from pathlib import Path
+
+          artifact_dir = Path(policy_path) / "motion_artifact"
+          artifact_dir.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(self._local_motion_file, artifact_dir / "motion.npz")
+          art = wandb.Artifact(
+            name=Path(self._local_motion_file).stem, type="motions"
+          )
+          art.add_file(str(artifact_dir / "motion.npz"))
+          wandb.run.use_artifact(art)  # type: ignore
+          wandb.run.log_artifact(art)  # type: ignore
+          self._motion_artifact_logged = True
     except Exception as e:
       print(f"[WARN] ONNX export failed (training continues): {e}")

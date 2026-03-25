@@ -154,6 +154,10 @@ def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
   runner_kwargs = {}
   if is_tracking_task:
     runner_kwargs["registry_name"] = registry_name
+    if registry_name is None:
+      motion_cmd_for_runner = cfg.env.commands["motion"]
+      assert isinstance(motion_cmd_for_runner, MotionCommandCfg)
+      runner_kwargs["local_motion_file"] = motion_cmd_for_runner.motion_file
 
   # Write config files before runner creation, since the runner mutates agent_cfg
   # in-place (e.g., injecting non-serializable objects).
