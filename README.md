@@ -83,6 +83,14 @@ MUJOCO_GL=egl uv run train Mjlab-Tracking-Flat-Unitree-G1 \
   --agent.save-interval 100
 ```
 
+### About terminations
+
+By default, mjlab terminates training episodes when the robot deviates too far from the reference motion (position or orientation). This works fine for simple motions like walking, but **for acrobatic motions (rolls, somersaults, etc.) you must disable terminations** — otherwise the robot gets killed mid-roll and never learns the full motion.
+
+- **`prompt-train`** disables terminations by default (`--disable-terminations` is `True`). To re-enable them for simpler motions, pass `--disable-terminations False`.
+- **Step-by-step training** requires manually setting high thresholds (as shown above with `threshold 100.0`) to effectively disable them.
+- **`play`** also needs `--no-terminations True` when viewing acrobatic policies, or the playback will cut short when the robot enters the roll/flip portion.
+
 ### Why preview first?
 
 Kimodo is a generative model — the same prompt can produce different quality motions depending on the wording, duration, and seed. Some motions may start in the air, clip through the ground, or not match what you had in mind. Previewing lets you iterate on the prompt quickly (generation takes ~2 seconds) before committing to a training run that could take hours.
