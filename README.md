@@ -87,7 +87,7 @@ Kimodo is a generative model — the same prompt can produce different quality m
 
 ### How long does training take?
 
-Training time depends on motion complexity (benchmarked on a single NVIDIA RTX PRO 6000):
+Training time depends on motion complexity. Times below are from a single NVIDIA RTX PRO 6000 (~RTX 5090 tier) running 4096 parallel environments:
 
 | Motion | Iterations to look good | Wall time |
 |--------|------------------------|-----------|
