@@ -4,7 +4,7 @@
 
 **Text-to-physics motion generation.** Type a text prompt, get a physics-trained robot policy.
 
-KimoLab combines [NVIDIA Kimodo](https://huggingface.co/spaces/nvidia/Kimodo) (text-to-motion diffusion) with [mjlab](https://github.com/mujocolab/mjlab) (GPU-accelerated robot learning via MuJoCo Warp) to create an end-to-end pipeline:
+KimoLab combines [NVIDIA Kimodo](https://research.nvidia.com/labs/sil/projects/kimodo/) (text-to-motion diffusion) with [mjlab](https://github.com/mujocolab/mjlab) (GPU-accelerated robot learning via MuJoCo Warp) to create an end-to-end pipeline:
 
 ```
 "A person bends down and does a forward somersault."
@@ -180,5 +180,5 @@ KimoLab is licensed under the [Apache License, Version 2.0](LICENSE), same as mj
 ## Acknowledgments
 
 - [mjlab](https://github.com/mujocolab/mjlab) team for the excellent GPU-accelerated RL framework
-- [NVIDIA Kimodo](https://huggingface.co/spaces/nvidia/Kimodo) team for the text-to-motion generation model
+- [NVIDIA Kimodo](https://research.nvidia.com/labs/sil/projects/kimodo/) team for the text-to-motion generation model
 - [MuJoCo Warp](https://github.com/google-deepmind/mujoco_warp) team for GPU-accelerated physics
