@@ -43,9 +43,12 @@ def prompt_train(
   output_fps: float = 50.0,
   # -- Training args --
   num_envs: int = 4096,
+  episode_length_s: float = 0.0,
+  save_interval: int = 100,
+  max_iterations: int = 30000,
+  disable_terminations: bool = True,
   # -- Misc --
   device: str = "cuda:0",
-  skip_wandb: bool = True,
   output_dir: str = "./prompt_motions",
 ):
   """Generate motion from text prompt and train a tracking policy.
@@ -59,8 +62,11 @@ def prompt_train(
     seed: Random seed for reproducibility.
     output_fps: Output FPS for the NPZ (mjlab sim rate, default: 50).
     num_envs: Number of parallel environments for training.
+    episode_length_s: Episode length in seconds (0 = auto: motion duration + 1s).
+    save_interval: Save checkpoint every N iterations.
+    max_iterations: Total training iterations.
+    disable_terminations: Disable tracking terminations (recommended for acrobatic motions).
     device: Torch device.
-    skip_wandb: If True, save NPZ locally instead of uploading to WandB.
     output_dir: Directory for generated motion files.
   """
   if prompt is None and motion_file is None:
@@ -117,18 +123,50 @@ def prompt_train(
   print("Step 3: Training tracking policy")
   print("=" * 60)
 
-  if skip_wandb:
-    print(f"Using local NPZ: {npz_path}")
-    print(f"To train, run:")
-    print(f"  uv run train Mjlab-Tracking-Flat-Unitree-G1 \\")
-    print(f"    --motion-file {npz_path} \\")
-    print(f"    --env.scene.num-envs {num_envs}")
-    print()
-    print("Or upload to WandB and use --registry-name instead.")
-  else:
-    print("Uploading to WandB and starting training...")
-    upload_to_wandb(str(npz_path), motion_name)
-    # TODO: invoke training with the registry name
+  # Auto-set episode length to motion duration + 1s buffer if not specified
+  total_duration = sum(durations)
+  if episode_length_s <= 0:
+    episode_length_s = total_duration + 1.0
+  print(f"  Motion duration: {total_duration:.1f}s")
+  print(f"  Episode length: {episode_length_s:.1f}s")
+  print(f"  Num envs: {num_envs}")
+  print(f"  Save interval: {save_interval}")
+  print(f"  Max iterations: {max_iterations}")
+  print(f"  Terminations disabled: {disable_terminations}")
+  print()
+
+  import os
+  os.environ["MUJOCO_GL"] = "egl"
+
+  from mjlab.scripts.train import TrainConfig, launch_training
+  from mjlab.tasks.tracking.config.g1.env_cfgs import unitree_g1_flat_tracking_env_cfg
+  from mjlab.tasks.tracking.config.g1.rl_cfg import unitree_g1_tracking_ppo_runner_cfg
+
+  env_cfg = unitree_g1_flat_tracking_env_cfg()
+  agent_cfg = unitree_g1_tracking_ppo_runner_cfg()
+
+  # Set motion file
+  from mjlab.tasks.tracking.mdp import MotionCommandCfg
+  motion_cmd = env_cfg.commands["motion"]
+  assert isinstance(motion_cmd, MotionCommandCfg)
+  motion_cmd.motion_file = str(npz_path.resolve())
+
+  # Set episode length
+  env_cfg.episode_length_s = episode_length_s
+
+  # Disable terminations for acrobatic motions
+  if disable_terminations:
+    for term_name in ["anchor_pos", "anchor_ori", "ee_body_pos"]:
+      if term_name in env_cfg.terminations:
+        env_cfg.terminations[term_name].params["threshold"] = 100.0
+
+  # Set training params
+  env_cfg.scene.num_envs = num_envs
+  agent_cfg.save_interval = save_interval
+  agent_cfg.max_iterations = max_iterations
+
+  train_cfg = TrainConfig(env=env_cfg, agent=agent_cfg)
+  launch_training(task_id="Mjlab-Tracking-Flat-Unitree-G1", args=train_cfg)
 
 
 def csv_to_npz_local(

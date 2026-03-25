@@ -28,7 +28,28 @@ uv sync --extra kimodo
 
 You also need access to [Meta-Llama-3-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct) on Hugging Face (accept the license, set `HF_TOKEN`).
 
-**2. Generate a motion from text:**
+### Option A: One Command (prompt straight to training)
+
+```bash
+uv run prompt-train \
+  --prompt "A person bends down and does a forward somersault." \
+  --duration 5.0 --seed 55
+```
+
+This generates the motion, converts it, and starts training automatically. All settings are configurable:
+
+```bash
+uv run prompt-train \
+  --prompt "A person walks forward" \
+  --duration 6.0 --seed 42 \
+  --num-envs 4096 \
+  --save-interval 100 \
+  --max-iterations 30000
+```
+
+### Option B: Step by Step (preview before training)
+
+**Generate a motion:**
 
 ```bash
 uv run prompt-to-csv \
@@ -36,21 +57,18 @@ uv run prompt-to-csv \
   --duration 5.0 --seed 55 --output motion.csv
 ```
 
-**3. Preview it before training:**
+**Convert and preview:**
 
 ```bash
-# Convert to NPZ first
 MUJOCO_GL=egl uv run -m mjlab.scripts.csv_to_npz \
   --input-file motion.csv --output-name my_motion \
   --input-fps 30 --output-fps 50 --render False
 
 cp /tmp/motion.npz motion.npz
-
-# Preview in MuJoCo viewer
 uv run preview-motion motion.npz --loop
 ```
 
-**4. Train a physics controller:**
+**Train (once you're happy with the motion):**
 
 ```bash
 MUJOCO_GL=egl uv run train Mjlab-Tracking-Flat-Unitree-G1 \
@@ -63,7 +81,7 @@ MUJOCO_GL=egl uv run train Mjlab-Tracking-Flat-Unitree-G1 \
   --agent.save-interval 100
 ```
 
-**5. Watch the trained policy:**
+### Watch the trained policy
 
 ```bash
 uv run play Mjlab-Tracking-Flat-Unitree-G1 \
