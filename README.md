@@ -81,6 +81,22 @@ MUJOCO_GL=egl uv run train Mjlab-Tracking-Flat-Unitree-G1 \
   --agent.save-interval 100
 ```
 
+### Why preview first?
+
+Kimodo is a generative model — the same prompt can produce different quality motions depending on the wording, duration, and seed. Some motions may start in the air, clip through the ground, or not match what you had in mind. Previewing lets you iterate on the prompt quickly (generation takes ~2 seconds) before committing to a training run that could take hours.
+
+### How long does training take?
+
+Training time depends on motion complexity (benchmarked on a single NVIDIA RTX PRO 6000):
+
+| Motion | Iterations to look good | Wall time |
+|--------|------------------------|-----------|
+| Walking forward | ~500 | ~5 minutes |
+| Simple gestures (wave, bow) | ~1,000-2,000 | ~15-30 minutes |
+| Complex motions (somersault, roll) | ~10,000+ | ~3-4 hours |
+
+The default is 30,000 iterations (~7-8 hours). You can check progress at any time using the `play` command, which pulls the latest checkpoint from WandB. For simple motions, you can stop training early once it looks good.
+
 ### Watch the trained policy
 
 ```bash
