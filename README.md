@@ -126,11 +126,31 @@ sequences:
     duration: 6.0
   - prompt: "A person waves with their right hand"
     duration: 3.0
+  - prompt: "A person bends down and does a forward somersault."
+    duration: 5.0
 ```
 
+Kimodo generates each segment independently and blends them at the boundaries using transition frames.
+
+**One command:**
 ```bash
-uv run prompt-to-csv --motion-file motions/my_sequence.yaml --output sequence.csv
+uv run prompt-train --motion-file motions/my_sequence.yaml
 ```
+
+**Or step by step:**
+```bash
+# Generate and preview
+uv run prompt-to-csv --motion-file motions/my_sequence.yaml --output sequence.csv
+
+MUJOCO_GL=egl uv run -m mjlab.scripts.csv_to_npz \
+  --input-file sequence.csv --output-name my_sequence \
+  --input-fps 30 --output-fps 50 --render False
+
+cp /tmp/motion.npz sequence.npz
+uv run preview-motion sequence.npz --loop
+```
+
+See `motions/walk_and_wave.yaml` and `motions/demo_somersault.yaml` for examples.
 
 ## New Commands
 
