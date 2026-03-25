@@ -1,5 +1,7 @@
 # KimoLab
 
+![KimoLab Demo](docs/source/_static/kimolab-demo.gif)
+
 **Text-to-physics motion generation.** Type a text prompt, get a physics-trained robot policy.
 
 KimoLab combines [NVIDIA Kimodo](https://huggingface.co/spaces/nvidia/Kimodo) (text-to-motion diffusion) with [mjlab](https://github.com/mujocolab/mjlab) (GPU-accelerated robot learning via MuJoCo Warp) to create an end-to-end pipeline:
